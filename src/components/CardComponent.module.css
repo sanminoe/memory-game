@@ -1,0 +1,20 @@
+.card {
+  user-select: none;
+}
+.hidden {
+  opacity: 0;
+}
+.show {
+  opacity: 1;
+}
+.item {
+  transition: opacity 0.1s linear;
+  user-select: none;
+}
+.front {
+  position: absolute;
+  width: 100%;
+  user-select: none;
+
+  height: 100%;
+}
