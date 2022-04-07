@@ -24,7 +24,7 @@ interface PropsGame {
 const Game = ({ deck, isSelectable, onSelectCard }: PropsGame) => {
   return (
     <>
-      <Grid mt="md">
+      <Grid mt="md" gutter="xs">
         {deck.map((c) => (
           <CardComponent
             key={c.id}

@@ -10,6 +10,7 @@ import {
   Select,
   Group,
   Progress,
+  Container,
 } from "@mantine/core";
 
 import { useInterval } from "@mantine/hooks";
@@ -39,28 +40,35 @@ interface Card {
 
 function App() {
   const difficulties: Difficulty = { easy: 6, medium: 9, hard: 15 };
+  const [attemps, setAttemps] = useState(difficulties.easy + 3);
   const [time, setTime] = useState<number>(0);
+  const [trials, setTrials] = useState(0);
 
   const interval = useInterval(() => setTime((t) => t + 1), 1000);
 
   const [difficulty, setDifficulty] = useState<string>("easy");
   const [level, setLevel] = useState(difficulties[difficulty]);
+  const [hasWon, setHasWon] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
 
   const [isPaused, setIsPaused] = useState(false);
 
   const [canSelect, setCanSelect] = useState<boolean>(true);
-  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   // UI
 
   // UI States
   const [deck, setDeck] = useState<Card[]>([]);
   const [showModal, setShowModal] = useState(true);
 
+  const [timeoutid, setTimeoutId] = useState(0);
+
   const handlerStartGame = () => {
     setShowModal(false);
-    createDeck();
+    if (!isPaused) {
+      createDeck();
+    }
     setIsPlaying(true);
     setIsPaused(false);
     interval.start();
@@ -76,7 +84,9 @@ function App() {
     setIsPlaying(false);
     setIsPaused(false);
     setTime(0);
+    setTrials(0);
     setDifficulty("easy");
+    setHasWon(false);
     interval.stop();
   };
 
@@ -84,20 +94,97 @@ function App() {
     setDeck([]);
   };
 
+  const validateSelections = (firstChoice: Card, secondChoice: Card) => {
+    if (firstChoice && secondChoice) {
+      setCanSelect(false);
+
+      let timerId: number = timeoutid;
+      let deckCard: Card[] = [];
+      console.log(firstChoice, secondChoice);
+      if (firstChoice.name === secondChoice.name && firstChoice.id !== secondChoice.id) {
+        deckCard = deck.map((c) => {
+          if (c.id === firstChoice.id) {
+            c.isCompleted = true;
+            c.show = true;
+          }
+
+          if (c.id === secondChoice.id) {
+            c.isCompleted = true;
+            c.show = true;
+          }
+
+          return { ...c };
+        });
+
+        let isCompleted = deck.every((card, index) => {
+          if (card.isCompleted) {
+            return card;
+          }
+        });
+        console.log(isCompleted);
+
+        if (isCompleted) {
+          handlerWinning();
+        }
+
+        setDeck(deckCard);
+        setSelectedCards([]);
+        setCanSelect(true);
+      } else {
+        // Do not match
+        deckCard = deck.map((c) => {
+          if (c.isCompleted === false && c.id === firstChoice.id) {
+            c.isCompleted = false;
+            c.selected = false;
+            c.show = false;
+          }
+          if (c.isCompleted === false && c.id === secondChoice.id) {
+            c.isCompleted = false;
+            c.selected = false;
+            c.show = false;
+          }
+
+          return { ...c };
+        });
+        // start a counter that when it finishes hides both cards
+        if (firstChoice.id !== secondChoice.id) {
+          setTrials((t) => t + 1);
+        }
+
+        timerId = setTimeout(() => {
+          setSelectedCards([]);
+          console.log("HIDE CARDS");
+          setDeck(deckCard);
+          setCanSelect(true);
+        }, 600);
+      }
+    }
+  };
+
   const handlerSelectCard = (id: string, name: string) => {
     if (canSelect === false) {
       return;
     }
     const cardIndex = deck.findIndex((c) => c.id === id && c.name === name);
-    const selectedCard: string = deck[cardIndex].id;
+    const selectedCard: Card = deck[cardIndex];
 
     let cardsSelected = [...selectedCards];
 
-    if (cardsSelected[1] === id || deck[cardIndex].isCompleted) {
+    if (
+      (selectedCard.isCompleted === true && cardsSelected.every((v) => v.isCompleted)) ||
+      selectedCard.isCompleted
+    ) {
       console.log("same");
       return;
     }
 
+    cardsSelected.push(selectedCard);
+
+    if (cardsSelected.length === 2 && cardsSelected[1].isCompleted) {
+      console.log("SAME 2");
+      return;
+    }
+    console.log(cardsSelected);
     let deckCards = deck.map((c) => {
       if (c.id === id) {
         c.selected = true;
@@ -106,13 +193,9 @@ function App() {
 
       return { ...c };
     });
-
-    cardsSelected.push(selectedCard);
-
-    if (cardsSelected.length === 2) {
-      setCanSelect(false);
-    }
+    setDeck(deckCards);
     setSelectedCards(cardsSelected);
+    validateSelections(cardsSelected[0], cardsSelected[1]);
   };
 
   const createDeck = () => {
@@ -147,62 +230,22 @@ function App() {
 
     setDeck(cards);
   };
+
+  const handlerWinning = () => {
+    setHasWon(true);
+    setShowModal(true);
+    setIsPaused(false);
+    interval.toggle();
+  };
+
   // validate choices
   useEffect(() => {
     if (selectedCards.length !== 2) {
       return;
-    }
-
-    const firstChoice: Card = deck.filter((c) => (c.id === selectedCards[0] ? c : null))[0];
-    const secondChoice: Card = deck.filter((c) => (c.id === selectedCards[1] ? c : null))[0];
-
-    let timeOutId: number;
-
-    let deckCards: Card[] = [];
-    if (firstChoice.name === secondChoice.name && firstChoice.id !== secondChoice.id) {
-      deckCards = deck.map((c) => {
-        if (c.id === firstChoice.id) {
-          c.isCompleted = true;
-          c.show = true;
-        }
-
-        if (c.id === secondChoice.id) {
-          c.isCompleted = true;
-          c.show = true;
-        }
-
-        return { ...c };
-      });
-
-      setDeck(deckCards);
-      setSelectedCards([]);
-      setCanSelect(true);
     } else {
-      // Do not match
-      deckCards = deck.map((c) => {
-        if (c.id === firstChoice.id) {
-          c.isCompleted = false;
-          c.selected = false;
-          c.show = false;
-        }
-        if (c.id === secondChoice.id) {
-          c.isCompleted = false;
-          c.selected = false;
-          c.show = false;
-        }
-
-        return { ...c };
-      });
-
-      // start a counter that when it finishes hides both cards
-      timeOutId = setTimeout(() => {
-        setDeck(deckCards);
-        setSelectedCards([]);
-        setCanSelect(true);
-        clearTimeout(timeOutId);
-      }, 1000);
+      setCanSelect(false);
     }
-  }, [selectedCards]);
+  }, [deck]);
 
   // Initial setup
 
@@ -221,7 +264,12 @@ function App() {
         </Group>
       </Header>
       <Center mt="lg">
-        <span>Time elapsed: {formatTime(time)}</span>
+        <Container>
+          <p>Time elapsed: {formatTime(time)}</p>
+        </Container>
+        <Container>
+          <p>Tries: {trials}</p>
+        </Container>
       </Center>
       <Center>
         <Modal
@@ -235,8 +283,13 @@ function App() {
               <h2>Memorize</h2>
             </div>
           </Center>
+          {hasWon && (
+            <Center>
+              <p>You've Won!</p>
+            </Center>
+          )}
 
-          {!isPaused ? (
+          {!isPaused && !hasWon ? (
             <Center>
               <Select
                 label="Difficulty"
@@ -251,18 +304,23 @@ function App() {
             </Center>
           ) : (
             <Center>
-              <p>Current Time: {formatTime(time)}</p>
+              <p>
+                {hasWon ? "You finished in:" : "Current Time:"} {formatTime(time)}
+              </p>
+              <p>{"tries: " + trials}</p>
             </Center>
           )}
 
           <Center my="lg">
             <Group>
-              {isPaused && (
+              {(isPaused || hasWon) && (
                 <Button color="red" onClick={handlerRestartGame}>
                   Restart
                 </Button>
               )}
-              <Button onClick={handlerStartGame}>{isPaused ? "Resume" : "Play"}</Button>
+              {!hasWon && (
+                <Button onClick={handlerStartGame}>{isPaused ? "Resume" : "Play"}</Button>
+              )}
             </Group>
           </Center>
         </Modal>

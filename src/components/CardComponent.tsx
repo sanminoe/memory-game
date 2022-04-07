@@ -13,6 +13,7 @@ interface PropsCard {
 const CardComponent = (props: PropsCard) => {
   return (
     <Grid.Col
+      sm={2}
       span={4}
       onClick={() => props.onSelect(props.id, props.name)}
       className={classes.card}
